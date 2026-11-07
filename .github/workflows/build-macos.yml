@@ -1,0 +1,69 @@
+name: Build macOS
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # per pubblicare le release quando si crea un tag v*
+
+jobs:
+  macos:
+    runs-on: macos-15          # Apple Silicon
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache JUCE
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: juce-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Configura (universal binary arm64 + x86_64)
+        run: cmake -B build -G Xcode -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+
+      - name: Compila
+        run: cmake --build build --config Release --parallel
+
+      - name: Test del modello
+        run: ./build/Release/circuit_test
+
+      - name: Firma ad-hoc e pacchetto
+        run: |
+          A=build/ALEA_artefacts/Release
+          mkdir -p "dist/ALEA"
+          cp -R "$A/VST3/ALEA.vst3" "$A/AU/ALEA.component" "$A/Standalone/ALEA.app" "dist/ALEA/"
+          for p in "dist/ALEA/"*; do codesign --force --deep --sign - "$p"; done
+          cp scripts/installa.command "dist/ALEA/Installa ALEA.command"
+          chmod +x "dist/ALEA/Installa ALEA.command"
+          cp README.md "dist/ALEA/"
+          cp docs/ALEA-Manuale-d-uso.pdf "dist/ALEA/"
+          lipo -info "dist/ALEA/ALEA.vst3/Contents/MacOS/ALEA"
+          (cd dist && ditto -c -k --keepParent "ALEA" ../ALEA-macOS.zip)
+
+      - name: Carica l'artefatto
+        uses: actions/upload-artifact@v4
+        with:
+          name: ALEA-macOS
+          path: ALEA-macOS.zip
+
+      - name: Verifica AU (auval)
+        continue-on-error: true
+        run: |
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R dist/ALEA/ALEA.component ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar 2>/dev/null || true
+          sleep 2
+          auval -v aufx Alea Clfx
+
+      - name: Pubblica la release (solo per i tag v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" ALEA-macOS.zip \
+            --title "Collateral Effects ALEA ${GITHUB_REF_NAME}" \
+            --notes "Build macOS universale (Apple Silicon e Intel) con VST3, AU e Standalone."
