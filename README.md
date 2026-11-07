@@ -16,6 +16,7 @@ sono quelle del pedale.
 | Deviatore FILTER / S/H | SW1 | 22 (commuta alla pressione) |
 | Footswitch (effetto on/off) | SW2 | 64 (pedale sustain) |
 | INPUT / OUTPUT (barra superiore) | — | — |
+| LIMIT (barra superiore) | — | — |
 
 - **FILTER**: un inviluppo (IC3, raddrizzatore di precisione, carica su C6 in ~15 ms, rilascio
   ~0,1–0,5 s) apre il filtro passa-banda mentre suoni. FILTER RANGE è la sensibilità: a zero il
@@ -31,7 +32,13 @@ sono quelle del pedale.
   La finestra sul frontale mostra la frequenza del filtro negli ultimi 4 secondi.
 
 Il pedale è mono: il plugin prende la chitarra da qualunque ingresso arrivi e copia l'uscita
-su tutti i canali. 0 dBFS in ingresso = 1 V di picco al jack del pedale.
+su tutti i canali. 0 dBFS in ingresso = 1 V di picco al jack del pedale; INPUT parte da
++10,8 dB, la taratura per una chitarra collegata direttamente all'ingresso di una scheda audio.
+
+**LIMIT** (attivo di partenza) è un limitatore di picco a latenza zero sull'uscita: tiene il segnale
+sotto −1 dBFS. Il passa-banda ha +20 dB di risonanza e una nota che cade sul centro del filtro
+può superare 0 dBFS: il pedale vero satura solo verso 7 V, ma in digitale quei picchi verrebbero
+tagliati dalla scheda audio con un suono "da cono rotto". La saturazione del circuito resta modellata.
 
 ## Interno (pulsante INTERNO)
 

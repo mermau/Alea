@@ -5,6 +5,7 @@
 #include <array>
 #include <atomic>
 #include "FSHCircuit.h"
+#include "PeakLimiter.h"
 
 namespace ParamIDs
 {
@@ -20,7 +21,15 @@ namespace ParamIDs
     inline constexpr const char* noise  = "noiseQ4";  // rumore del transistor Q4 ("selected for noise")
     inline constexpr const char* unit   = "unit";     // esemplare: tolleranze dei componenti (0 = schema)
     inline constexpr const char* pickup = "pickupLoad"; // carico di ~100 kOhm su un pickup passivo
+    inline constexpr const char* limiter = "limiter";   // protezione dell'uscita digitale
 }
+
+namespace Defaults
+{
+    inline constexpr float inputDb = 10.8f;
+}
+
+
 
 namespace Factory
 {
@@ -81,6 +90,7 @@ public:
     // per l'interfaccia: impulsi del clock S/H e frequenza del filtro
     std::atomic<int>   clockPulses { 0 };
     std::atomic<float> centreHz { 300.0f };
+    std::atomic<float> gainReductionDb { 0.0f };   // per la spia LIMIT
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
@@ -102,6 +112,8 @@ private:
     std::atomic<float>* noiseRaw  = nullptr;
     std::atomic<float>* unitRaw   = nullptr;
     std::atomic<float>* pickupRaw = nullptr;
+    std::atomic<float>* limitRaw  = nullptr;
+    PeakLimiter limiter;
     juce::AudioParameterBool* bypassParam = nullptr;
 
     std::array<juce::RangedAudioParameter*, numLearnable> learnParams {};

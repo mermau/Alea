@@ -122,6 +122,9 @@ private:
     std::unique_ptr<BA> bypassA, modeA;
 
     juce::TextButton interiorBtn { "INTERNO" };
+    juce::TextButton limitBtn { "LIMIT" };
+    std::unique_ptr<BA> limitA;
+    float limitGlow = 0.0f;
     std::unique_ptr<InteriorPanel> interior;
 
     juce::Typeface::Ptr face;

@@ -1,7 +1,8 @@
 // Test del modello del circuito (senza JUCE).
 // Esce con codice 1 se un controllo fallisce.
 #include "FSHCircuit.h"
-#include "FSHCircuitRef.h"   // modello della versione 1.0, per il confronto
+#include "FSHCircuitRef.h"
+#include "PeakLimiter.h"   // modello della versione 1.0, per il confronto
 #include <cstdio>
 #include <vector>
 #include <cmath>
@@ -254,6 +255,39 @@ int main()
         bool ok = true;
         for (int i = 0; i < 1000; ++i) { auto o = c.process (0.2 * std::sin (i * 0.01), false); ok = ok && o.wet == 0.0; }
         check (ok, "nessun calcolo del filtro in bypass");
+    }
+
+    std::printf ("Limitatore d'uscita (note singole sulla risonanza, INPUT +10,8 dB)\n");
+    {
+        const double g = std::pow (10.0, 10.8 / 20.0);
+        auto run = [&] (int how)   // 0 = taglio della scheda audio, 1 = limitatore
+        {
+            FSHCircuit c; c.prepare (192000.0, 4); c.setControls (0.5, 0.5, false);
+            PeakLimiter lim; lim.prepare (48000.0);
+            double ph = 0, pk = 0, hf = 0, tot = 0, prev = 0, prevy = 0;
+            for (int i = 0; i < 192000 * 12; ++i)
+            {
+                const int note = i / 96000; const double f = 110.0 * std::pow (2.0, (note % 24) / 12.0);
+                const double t = std::fmod (i / 192000.0, 0.5);
+                ph += f / 192000.0; ph -= std::floor (ph);
+                const double y = c.process (g * 0.12 * std::exp (-3 * t) * (ph < 0.5 ? 4 * ph - 1 : 3 - 4 * ph)).wet;
+                if (i % 4) continue;   // 48 kHz
+                float v = (float) y;
+                if (how == 0) v = std::clamp (v, -1.0f, 1.0f); else if (how == 1) lim.process (&v, 1);
+                pk = std::max (pk, (double) std::abs (v));
+                // energia della differenza seconda: indicatore di spigoli e armoniche alte aggiunte
+                const double d2 = v - 2 * prev + prevy; hf += d2 * d2; tot += (double) v * v;
+                prevy = prev; prev = v;
+            }
+            return std::make_pair (pk, 10 * std::log10 (hf / tot));
+        };
+        const auto cl = run (0), li = run (1), raw = run (2);
+        std::printf ("  energia delle alte rispetto al segnale: senza limiti %.1f dB, taglio a 0 dBFS %.1f dB, limitatore %.1f dB\n",
+                     raw.second, cl.second, li.second);
+        std::printf ("  picco: senza limiti %.2f, limitatore %.3f\n", raw.first, li.first);
+        check (li.first <= 0.8915, "nessun campione oltre -1 dBFS");
+        check (std::abs (li.second - raw.second) < 0.5 && cl.second > raw.second + 3.0,
+               "il limitatore non aggiunge spigoli, il taglio della scheda sì");
     }
 
     std::printf ("Prestazioni (48 kHz x4, 10 s di audio)\n");

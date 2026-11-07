@@ -231,12 +231,15 @@ void LearnableToggle::mouseDown (const juce::MouseEvent& e)
     Button::mouseDown (e);
 }
 
-void Footswitch::paintButton (juce::Graphics& g, bool highlighted, bool down)
+void Footswitch::paintButton (juce::Graphics& g, bool, bool down)
 {
+    // Vista dall'alto con luce fissa in alto a sinistra. Premendo, il pulsante scende dentro
+    // la ghiera: si accorciano la parete laterale visibile e l'ombra che proietta nel foro.
     using namespace juce;
     const auto b = getLocalBounds().toFloat();
     const auto c = b.getCentre();
     const float R = jmin (b.getWidth(), b.getHeight()) * 0.5f;
+    auto disc = [] (Point<float> p, float r) { return Rectangle<float> (2 * r, 2 * r).withCentre (p); };
 
     // dado esagonale
     Path hex;
@@ -247,22 +250,65 @@ void Footswitch::paintButton (juce::Graphics& g, bool highlighted, bool down)
     }
     hex.closeSubPath();
     g.setColour (Colours::black.withAlpha (0.35f));
-    g.fillPath (hex, AffineTransform::translation (0, 3.0f));
+    g.fillPath (hex, AffineTransform::translation (1.5f, 3.0f));
     g.setGradientFill (chrome (c, R, 0.25f));
     g.fillPath (hex);
     g.setColour (Colours::black.withAlpha (0.3f));
     g.strokePath (hex, PathStrokeType (1.0f));
 
-    // anello e pulsante
-    const float ring = R * 0.66f, dome = R * (down ? 0.46f : 0.5f);
-    g.setGradientFill (chrome (c, ring, 0.35f));
-    g.fillEllipse (Rectangle<float> (2 * ring, 2 * ring).withCentre (c));
-    g.setColour (Colours::black.withAlpha (0.45f));
-    g.fillEllipse (Rectangle<float> (2 * dome + 4, 2 * dome + 4).withCentre (c.translated (0, 2.0f)));
-    g.setGradientFill (chrome (c, dome, down ? 0.25f : (highlighted ? -0.05f : 0.0f)));
-    g.fillEllipse (Rectangle<float> (2 * dome, 2 * dome).withCentre (c));
-    g.setColour (Colours::white.withAlpha (0.35f));
-    g.fillEllipse (Rectangle<float> (dome * 0.7f, dome * 0.42f).withCentre (c.translated (-dome * 0.28f, -dome * 0.42f)));
+    // ghiera e foro
+    const float ring = R * 0.68f, hole = R * 0.55f, rp = R * 0.47f;
+    g.setGradientFill (chrome (c, ring, 0.3f));
+    g.fillEllipse (disc (c, ring));
+    g.setColour (Colours::black.withAlpha (0.25f));
+    g.drawEllipse (disc (c, ring), 1.0f);
+    ColourGradient holeG (Colour (0xff050506), c.x - hole * 0.6f, c.y - hole * 0.6f,
+                          Colour (0xff2a2c30), c.x + hole * 0.7f, c.y + hole * 0.8f, false);
+    g.setGradientFill (holeG);
+    g.fillEllipse (disc (c, hole));
+
+    // corsa del pulsante: altezza sopra il piano della ghiera
+    const float h = R * (down ? 0.03f : 0.11f);
+    const auto top = c.translated (0.0f, -h);
+
+    {   // ombra proiettata dentro il foro (verso il basso a destra, più corta se premuto)
+        Graphics::ScopedSaveState ss (g);
+        Path clip; clip.addEllipse (disc (c, hole));
+        g.reduceClipRegion (clip);
+        const auto sc = c.translated (h * 0.9f, h * 1.2f);
+        for (int i = 0; i < 6; ++i)
+        {
+            g.setColour (Colours::black.withAlpha (0.16f));
+            g.fillEllipse (disc (sc, rp + (float) i * R * 0.012f));
+        }
+    }
+
+    // parete laterale del cilindro (visibile sotto la faccia superiore)
+    {
+        Path wall;
+        wall.addEllipse (disc (c, rp));
+        wall.addRectangle (c.x - rp, top.y, 2 * rp, c.y - top.y);
+        g.setGradientFill (ColourGradient (Colour (0xff9a9ea4), c.x - rp, c.y, Colour (0xff3b3e43), c.x + rp, c.y, false));
+        g.fillPath (wall);
+    }
+
+    // faccia superiore: alluminio lucido, riflesso fisso rispetto alla luce
+    ColourGradient face (Colour (0xfffbfbfc), top.x - rp * 0.45f, top.y - rp * 0.5f,
+                         Colour (0xff5f6369), top.x + rp * 0.9f, top.y + rp * 0.95f, true);
+    face.addColour (0.30, Colour (0xffe2e4e7));
+    face.addColour (0.70, Colour (0xff9da1a7));
+    g.setGradientFill (face);
+    g.fillEllipse (disc (top, rp));
+    g.setColour (Colours::white.withAlpha (0.55f));
+    g.drawEllipse (disc (top, rp - 0.8f), 1.0f);       // spigolo smussato illuminato
+    g.setColour (Colours::black.withAlpha (0.25f));
+    {
+        Path rim; rim.addCentredArc (top.x, top.y, rp - 0.5f, rp - 0.5f, 0.0f,
+                                     MathConstants<float>::pi * 0.65f, MathConstants<float>::pi * 1.35f, true);
+        g.strokePath (rim, PathStrokeType (1.2f));
+    }
+    g.setColour (Colours::white.withAlpha (0.45f));
+    g.fillEllipse (Rectangle<float> (rp * 0.55f, rp * 0.32f).withCentre (top.translated (-rp * 0.32f, -rp * 0.38f)));
 }
 
 void ModeSwitch::paintButton (juce::Graphics& g, bool highlighted, bool)
@@ -496,7 +542,8 @@ AleaEditor::AleaEditor (AleaProcessor& p)
     inA    = std::make_unique<SA> (proc.apvts, ParamIDs::input, inTrim);
     outA   = std::make_unique<SA> (proc.apvts, ParamIDs::output, outTrim);
     for (auto* s : { &range, &speed }) s->setDoubleClickReturnValue (true, 0.5);
-    for (auto* s : { &inTrim, &outTrim }) s->setDoubleClickReturnValue (true, 0.0);
+    inTrim.setDoubleClickReturnValue (true, Defaults::inputDb);
+    outTrim.setDoubleClickReturnValue (true, 0.0);
 
     footswitch.setTooltip ("Footswitch: effetto inserito / escluso (clic destro: MIDI Learn)");
     footswitch.onLearnMenu = [this] { showLearnMenu (3, &footswitch); };
@@ -520,6 +567,12 @@ AleaEditor::AleaEditor (AleaProcessor& p)
         resized();
     };
     addAndMakeVisible (interiorBtn);
+
+    limitBtn.setClickingTogglesState (true);
+    limitBtn.setTooltip (String::fromUTF8 ("Limitatore d'uscita: tiene i picchi sotto −1 dBFS, così le note che cadono sulla "
+                                           "risonanza non vengono tagliate dalla scheda audio. La spia si accende quando interviene."));
+    addAndMakeVisible (limitBtn);
+    limitA = std::make_unique<BA> (proc.apvts, ParamIDs::limiter, limitBtn);
 
     setResizable (true, true);
     getConstrainer()->setFixedAspectRatio ((double) baseW / (double) baseH);
@@ -547,8 +600,9 @@ void AleaEditor::resized()
     footswitch.setBounds (scaled (footC.x - 46.0f, footC.y - 46.0f, 92.0f, 92.0f));
     modeSwitch.setBounds (scaled (switchR.getX(), switchR.getY(), switchR.getWidth(), switchR.getHeight()));
     inTrim.setBounds  (scaled (78.0f, 7.0f, 34.0f, 34.0f));
-    outTrim.setBounds (scaled (226.0f, 7.0f, 34.0f, 34.0f));
+    outTrim.setBounds (scaled (244.0f, 7.0f, 34.0f, 34.0f));
     interiorBtn.setBounds (scaled (598.0f, 10.0f, 106.0f, 28.0f));
+    limitBtn.setBounds (scaled (346.0f, 10.0f, 74.0f, 28.0f));
     if (interior != nullptr)
         interior->setBounds (scaled (bodyR.getX(), bodyR.getY(), bodyR.getWidth(), bodyR.getHeight()));
 
@@ -570,7 +624,7 @@ void AleaEditor::resized()
         g.drawHorizontalLine (47, 0.0f, (float) baseW);
         g.setColour (cream.withAlpha (0.75f));
         text (g, uiFont (11.5f), "INPUT", 18.0f, 28.5f, Justification::left);
-        text (g, uiFont (11.5f), "OUTPUT", 160.0f, 28.5f, Justification::left);
+        text (g, uiFont (11.5f), "OUTPUT", 178.0f, 28.5f, Justification::left);
 
         // sfondo e ombra del pedale
         g.setGradientFill (ColourGradient (Colour (0xff2b2c2f), 0, 48, Colour (0xff18191b), 0, (float) baseH, false));
@@ -677,13 +731,14 @@ void AleaEditor::paint (juce::Graphics& g)
         return (v > 0.05f ? "+" : "") + String (v, 1) + " dB";
     };
     text (g, uiFont (11.5f), dB (ParamIDs::input), 118.0f, 28.5f, Justification::left);
-    text (g, uiFont (11.5f), dB (ParamIDs::output), 266.0f, 28.5f, Justification::left);
+    text (g, uiFont (11.5f), dB (ParamIDs::output), 284.0f, 28.5f, Justification::left);
 
     // stato MIDI
     const int learn = proc.getLearningParam();
     g.setColour (learn >= 0 ? learnCol : cream.withAlpha (0.6f));
-    text (g, uiFont (11.5f), learn >= 0 ? String ("MIDI LEARN: muovi un controllo per ") + displayNames[learn] : midiText,
-          446.0f, 28.5f);
+    g.setFont (uiFont (11.0f));
+    g.drawFittedText (learn >= 0 ? String ("MIDI LEARN: muovi un controllo per ") + displayNames[learn] : midiText,
+                      juce::Rectangle<int> (428, 4, 164, 40), Justification::centred, 2, 0.9f);
 
     // traccia della frequenza centrale del filtro
     paintScope (g, scopeR.reduced (10.0f, 10.0f));
@@ -727,6 +782,24 @@ void AleaEditor::paintScope (juce::Graphics& g, juce::Rectangle<float> r)
 
 void AleaEditor::paintOverChildren (juce::Graphics& g)
 {
+    using namespace juce;
+    // spia del limitatore, dentro il pulsante LIMIT
+    if (limitBtn.getToggleState())
+    {
+        Graphics::ScopedSaveState ss (g);
+        g.addTransform (AffineTransform::scale (scale));
+        const Point<float> c (358.0f, 24.0f);
+        g.setColour (Colour (0xff3a2a08));
+        g.fillEllipse (Rectangle<float> (7.0f, 7.0f).withCentre (c));
+        if (limitGlow > 0.02f)
+        {
+            g.setColour (mustard.withAlpha (jlimit (0.0f, 1.0f, limitGlow)));
+            g.fillEllipse (Rectangle<float> (7.0f, 7.0f).withCentre (c));
+            g.setColour (mustard.withAlpha (0.35f * limitGlow));
+            g.fillEllipse (Rectangle<float> (15.0f, 15.0f).withCentre (c));
+        }
+    }
+
     const int learn = proc.getLearningParam();
     if (learn < 0) return;
     if (auto* c = controlFor (learn))
@@ -750,6 +823,9 @@ void AleaEditor::timerCallback()
     else flash *= 0.55f;
     lastPulses = pulses;
 
+    const float gr = proc.gainReductionDb.exchange (0.0f, std::memory_order_relaxed);
+    limitGlow = juce::jmax (limitGlow * 0.8f, juce::jlimit (0.0f, 1.0f, gr / 3.0f + (gr > 0.1f ? 0.4f : 0.0f)));
+
     const int learn = proc.getLearningParam();
     pulse = 0.5f + 0.5f * std::sin ((float) juce::Time::getMillisecondCounter() * 0.008f);
 
@@ -759,7 +835,7 @@ void AleaEditor::timerCallback()
         lastCCCount = cc; lastMapVersion = proc.getMapVersion();
         const int num = proc.lastCC.load();
         midiText = num >= 0 ? "MIDI  CC " + juce::String (num) + "  =  " + juce::String (proc.lastCCValue.load())
-                            : juce::String ("MIDI: clic destro su un comando per il Learn");
+                            : juce::String ("MIDI: clic destro su un comando");
     }
 
     if (learn != lastLearn || learn >= 0) { lastLearn = learn; repaint(); return; }

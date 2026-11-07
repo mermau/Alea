@@ -19,10 +19,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout AleaProcessor::createLayout(
             AudioParameterFloatAttributes().withStringFromValueFunction (
                 [] (float v, int) { return String (v * 10.0f, 1); }));
     };
-    auto trim = [] (const char* id, const char* name)
+    auto trim = [] (const char* id, const char* name, float def)
     {
         return std::make_unique<AudioParameterFloat> (
-            ParameterID { id, 1 }, name, NormalisableRange<float> (-24.0f, 24.0f, 0.1f), 0.0f,
+            ParameterID { id, 1 }, name, NormalisableRange<float> (-24.0f, 24.0f, 0.1f), def,
             AudioParameterFloatAttributes().withLabel ("dB"));
     };
 
@@ -35,8 +35,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout AleaProcessor::createLayout(
         AudioParameterBoolAttributes().withStringFromValueFunction (
             [] (bool b, int) { return String (b ? "Sample/Hold" : "Filter"); })));
     layout.add (std::make_unique<AudioParameterBool> (ParameterID { ParamIDs::bypass, 1 }, "Bypass", false));
-    layout.add (trim (ParamIDs::input,  "Input Trim"));
-    layout.add (trim (ParamIDs::output, "Output Trim"));
+    // +10.8 dB: chitarra collegata direttamente all'ingresso di una scheda audio
+    layout.add (trim (ParamIDs::input,  "Input Trim", Defaults::inputDb));
+    layout.add (trim (ParamIDs::output, "Output Trim", 0.0f));
 
     auto pct = [] (const char* id, const char* name, float def)
     {
@@ -57,6 +58,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout AleaProcessor::createLayout(
             [] (int v, int) { return v == 0 ? String ("schema") : String (v); })
             .withValueFromStringFunction ([] (const String& t) { return t.trim().getIntValue(); })));
     layout.add (std::make_unique<AudioParameterBool> (ParameterID { ParamIDs::pickup, 1 }, "Pickup Load", false));
+    layout.add (std::make_unique<AudioParameterBool> (ParameterID { ParamIDs::limiter, 1 }, "Output Limiter", true));
     return layout;
 }
 
@@ -77,6 +79,7 @@ AleaProcessor::AleaProcessor()
     noiseRaw  = apvts.getRawParameterValue (ParamIDs::noise);
     unitRaw   = apvts.getRawParameterValue (ParamIDs::unit);
     pickupRaw = apvts.getRawParameterValue (ParamIDs::pickup);
+    limitRaw  = apvts.getRawParameterValue (ParamIDs::limiter);
     bypassParam = dynamic_cast<juce::AudioParameterBool*> (apvts.getParameter (ParamIDs::bypass));
 
     for (int i = 0; i < numLearnable; ++i)
@@ -195,6 +198,7 @@ void AleaProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     initSm (inGainSm,  juce::Decibels::decibelsToGain (inRaw->load()),  0.03);
     initSm (outGainSm, juce::Decibels::decibelsToGain (outRaw->load()), 0.03);
     initSm (wetSm, bypassRaw->load() > 0.5f ? 0.0f : 1.0f, 0.008);   // SW2 senza schiocco
+    limiter.prepare (sampleRate);
 }
 
 void AleaProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
@@ -273,6 +277,14 @@ void AleaProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBu
         oversampling->processSamplesDown (mono);
 
         for (int i = 0; i < n; ++i) x[i] *= outGainSm.getNextValue() / voltsPerFS;
+
+        // protezione dell'uscita: il pedale satura solo verso 7 V, ma in digitale tutto ciò che
+        // supera 0 dBFS verrebbe tagliato di netto dalla scheda audio
+        if (limitRaw->load() > 0.5f) limiter.process (x, n);
+        else limiter.idle();
+        // la spia tiene il valore più alto finché l'interfaccia non lo legge
+        if (const float r = limiter.reductionDb(); r > gainReductionDb.load (std::memory_order_relaxed))
+            gainReductionDb.store (r, std::memory_order_relaxed);
         for (int ch = 1; ch < numCh; ++ch)
             juce::FloatVectorOperations::copy (block.getChannelPointer ((size_t) ch), x, n);
     }

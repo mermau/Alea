@@ -6,6 +6,26 @@
 int main (int argc, char** argv)
 {
     juce::ScopedJuceInitialiser_GUI init;
+    if (argc > 1 && juce::String (argv[1]) == "footswitch")      // stati del footswitch, ingranditi
+    {
+        juce::Image img (juce::Image::ARGB, 4 * 240, 240, true);
+        juce::Graphics g (img);
+        g.fillAll (juce::Colour (0xffe9e0cb));
+        for (int i = 0; i < 2; ++i)
+        {
+            Footswitch fs; fs.setBounds (0, 0, 200, 200);
+            juce::Graphics::ScopedSaveState ss (g);
+            g.setOrigin (20 + i * 480, 20);
+            fs.paintButton (g, false, i == 1);
+            g.setOrigin (240, 0);
+            g.addTransform (juce::AffineTransform::scale (0.46f).translated (40, 50));
+            fs.setBounds (0, 0, 200, 200);
+            fs.paintButton (g, false, i == 1);
+        }
+        juce::File f = juce::File::getCurrentWorkingDirectory().getChildFile (argc > 2 ? argv[2] : "footswitch.png");
+        f.deleteFile(); juce::FileOutputStream os (f); juce::PNGImageFormat().writeImageToStream (img, os);
+        return 0;
+    }
     const juce::String out = argc > 1 ? argv[1] : "snapshot.png";
     const float scale = argc > 2 ? (float) std::atof (argv[2]) : 1.0f;
     const bool interior = argc > 3 && std::atoi (argv[3]) != 0;
