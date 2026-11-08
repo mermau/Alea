@@ -6,6 +6,11 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Pubblica una release con questo tag (es. v1.3.0); vuoto = solo build"
+        required: false
+        default: ""
 
 permissions:
   contents: write   # per pubblicare le release quando si crea un tag v*
@@ -69,11 +74,17 @@ jobs:
           $PV --strictness-level 8 --timeout-ms 600000 --validate ~/Library/Audio/Plug-Ins/VST3/ALEA.vst3
           $PV --strictness-level 8 --timeout-ms 600000 --validate ~/Library/Audio/Plug-Ins/Components/ALEA.component
 
-      - name: Pubblica la release (solo per i tag v*)
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Pubblica la release (tag v* oppure avvio manuale con release_tag)
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.release_tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" ALEA-macOS.zip \
-            --title "Collateral Effects ALEA ${GITHUB_REF_NAME}" \
-            --notes "Build macOS universale (Apple Silicon e Intel) con VST3, AU e Standalone."
+          NOTES="docs/release/${TAG}.md"
+          [ -f "$NOTES" ] || { echo "Build macOS universale (Apple Silicon e Intel) con VST3, AU e Standalone." > /tmp/notes.md; NOTES=/tmp/notes.md; }
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" ALEA-macOS.zip --clobber
+          else
+            gh release create "$TAG" ALEA-macOS.zip docs/ALEA-Manuale-d-uso.pdf \
+              --target "$GITHUB_SHA" --title "Collateral Effects ALEA ${TAG#v}" --notes-file "$NOTES"
+          fi
