@@ -59,6 +59,16 @@ jobs:
           sleep 2
           auval -v aufx Alea Clfx
 
+      - name: Verifica con pluginval (VST3 e AU)
+        run: |
+          curl -sSL -o pluginval.zip https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_macOS.zip
+          unzip -q pluginval.zip
+          PV=pluginval.app/Contents/MacOS/pluginval
+          mkdir -p ~/Library/Audio/Plug-Ins/VST3
+          cp -R dist/ALEA/ALEA.vst3 ~/Library/Audio/Plug-Ins/VST3/
+          $PV --strictness-level 8 --timeout-ms 600000 --validate ~/Library/Audio/Plug-Ins/VST3/ALEA.vst3
+          $PV --strictness-level 8 --timeout-ms 600000 --validate ~/Library/Audio/Plug-Ins/Components/ALEA.component
+
       - name: Pubblica la release (solo per i tag v*)
         if: startsWith(github.ref, 'refs/tags/v')
         env:

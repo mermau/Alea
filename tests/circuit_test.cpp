@@ -170,7 +170,7 @@ int main()
 
     std::printf ("Confronto con il modello 1.0 (stesse ipotesi: Q2 a guadagno 1, controllo a 192 kHz)\n");
     {
-        alea::FSHCircuit n; n.prepare (fs, 1); n.setFollowerGain (1.0); n.setControls (0.7, 0.5, false);
+        alea::FSHCircuit n; n.prepare (fs, 1); n.setLegacyModel (true); n.setFollowerGain (1.0); n.setControls (0.7, 0.5, false);
         alearef::FSHCircuit o; o.prepare (fs); o.setControls (0.7, 0.5, false);
         double se = 0, ss = 0;
         for (int i = 0; i < (int) (fs * 3.0); ++i)
@@ -228,6 +228,37 @@ int main()
         }
         check (fMax / fMin > 1.05 && fMax / fMin < 2.0, "gli esemplari differiscono in modo plausibile");
         check (qMin > 5.0 && qMax < 20.0, "Q sempre nell'intervallo del circuito");
+    }
+
+    std::printf ("Correnti di base dei 3080 ed escursione asimmetrica (1.3 contro 1.2)\n");
+    {
+        auto meas = [&] (bool legacy, double iabc, double& f, double& q)
+        {
+            double best = -1e9, bf = 0;
+            auto g = [&] (double fr)
+            {
+                FSHCircuit c; c.prepare (fs, 4); c.setLegacyModel (legacy); c.setIabcOverride (iabc);
+                double s2 = 0, si = 0;
+                for (int i = 0; i < (int) (fs * 0.5); ++i)
+                {
+                    const double x = 0.002 * std::sin (2 * PI * fr * i / fs);
+                    const double y = c.process (x).wet;
+                    if (i > fs * 0.35) { s2 += y * y; si += x * x; }
+                }
+                return 10 * std::log10 (s2 / si);
+            };
+            for (double fr = 200; fr < 20000; fr *= 1.03) { const double v = g (fr); if (v > best) { best = v; bf = fr; } }
+            double c0 = bf, lo = 1e9, hi = 0; best = -1e9;
+            std::vector<std::pair<double, double>> cv;
+            for (double fr = c0 * 0.85; fr < c0 * 1.18; fr *= 1.004) { const double v = g (fr); cv.push_back ({ fr, v }); if (v > best) { best = v; bf = fr; } }
+            for (auto& pr : cv) if (pr.second >= best - 3) { lo = std::min (lo, pr.first); hi = std::max (hi, pr.first); }
+            f = bf; q = bf / (hi - lo);
+        };
+        double f0, q0, f1, q1;
+        meas (true, 80e-6, f0, q0); meas (false, 80e-6, f1, q1);
+        std::printf ("  Iabc 80 uA: centro %.0f -> %.0f Hz, Q %.2f -> %.2f\n", f0, f1, q0, q1);
+        check (f1 / f0 > 0.95 && f1 / f0 < 0.995, "frequenza leggermente piu' bassa (resistenza d'ingresso)");
+        check (q1 / q0 > 0.88 && q1 / q0 < 0.99, "Q leggermente piu' basso, senza artefatti");
     }
 
     std::printf ("Carico del pickup (ingresso del pedale ~100 kOhm)\n");

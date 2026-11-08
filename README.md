@@ -93,6 +93,18 @@ clock, apertura dell'inviluppo, distribuzione dei gradini S/H, stabilità a 44,1
 - Filtro: integrazione trapezoidale con soluzione di Newton delle due OTA; con il predittore
   lineare basta una correzione per campione (errore sotto −138 dB rispetto alla soluzione esatta).
 - Q2 è un inseguitore con guadagno 0,94; R6 e R13 alimentano separatamente i due 3080.
+- Dalla 1.3, correnti di base dei CA3080 (β ≈ 125, cioè 2 µA a Iabc 500 µA e 26 kΩ d'ingresso,
+  come da datasheet): escono da C5 e attraversano le resistenze di polarizzazione (R4//R5//R7,
+  R9//R10 e R12, che sul pin 3 di IC2 le compensa). Sono risolte in modo implicito nel Newton.
+  Effetto: Q dal 3 al 6 % più basso, frequenza che sale un po' meno che in proporzione a Iabc
+  (−3,5 % in cima alla gamma), una seconda armonica attorno a −70 dB.
+- Escursione asimmetrica della tensione su C3: in alto la limita la saturazione di Q2, in basso
+  l'uscita del 3080 (circa 1,4 V e 0,5 V dai binari ±8 V), attorno al punto di lavoro −Vgs di Q2.
+- Q6 in S/H è caricato anche da R22 verso l'emettitore di Q3: i gradini più alti si comprimono un po'.
+- Correzione della deformazione di frequenza dell'integrazione trapezoidale (tan(x)/x alla
+  frequenza centrale, aggiornata alla frequenza base): il picco cade alla frequenza analogica.
+- Il test confronta le novità della 1.3 con il modello della 1.2 (`setLegacyModel`); la soluzione
+  a passo singolo degli ingressi dei 3080 resta entro −120 dB da quella esatta.
 - A effetto escluso il filtro audio non viene calcolato (la parte di controllo sì, come nel pedale).
 - Dalla 1.1 il modello è circa 3 volte più veloce della 1.0; il test `circuit_test` confronta
   il suono con il modello 1.0 (`tests/FSHCircuitRef.h`): a regime la differenza è sotto −110 dB.

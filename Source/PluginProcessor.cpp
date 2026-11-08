@@ -294,6 +294,9 @@ void AleaProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBu
 void AleaProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     juce::XmlElement root ("AleaState");
+   #ifdef JucePlugin_VersionString
+    root.setAttribute ("version", JucePlugin_VersionString);   // per eventuali conversioni future
+   #endif
     if (auto params = apvts.copyState().createXml()) root.addChildElement (params.release());
 
     auto* map = root.createNewChildElement ("MIDIMAP");
