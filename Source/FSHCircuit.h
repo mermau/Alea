@@ -30,6 +30,9 @@
 #ifndef NEWTON_COUNT
  #define NEWTON_COUNT
 #endif
+#ifndef NEWTON_FAIL_HOOK
+ #define NEWTON_FAIL_HOOK(it, du)
+#endif
 #ifndef NEWTON_TOL
  #define NEWTON_TOL 3e-4
 #endif
@@ -582,6 +585,7 @@ private:
             // circa il quadrato del passo, quindi sotto 3e-4 è trascurabile (< 1e-7)
             const double du = std::max (std::abs (dx2 - bFb * dx1), std::abs (cFb * dx1)) * k2;
             if (du < NEWTON_TOL) break;
+            NEWTON_FAIL_HOOK(it, du)
         }
         // escursione: saturazione morbida verso i limiti (asimmetrici) di 3080 e Q2
         constexpr double span = 1.0;

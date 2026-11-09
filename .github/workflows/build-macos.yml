@@ -62,7 +62,7 @@ jobs:
           cp -R dist/ALEA/ALEA.component ~/Library/Audio/Plug-Ins/Components/
           killall -9 AudioComponentRegistrar 2>/dev/null || true
           sleep 2
-          auval -v aufx Alea Clfx
+          auval -v aumf Alea Clfx
 
       - name: Verifica con pluginval (VST3 e AU)
         run: |

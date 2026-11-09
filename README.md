@@ -71,7 +71,10 @@ pulsanti in modalità *Gate/Momentary* in Arturia MIDI Control Center.
 
 In Ableton Live un effetto audio non riceve MIDI da solo: o usi la mappatura MIDI di Live
 (Configura → muovi il comando del plugin → Cmd+M), oppure crei una traccia MIDI con ingresso
-KeyLab e uscita "ALEA" sulla traccia della chitarra. La Standalone riceve la KeyLab direttamente.
+KeyLab, Monitor su **In** e, in "MIDI To", la traccia della chitarra e poi "ALEA". Dalla 1.3.1
+l'AU è registrato come effetto controllabile via MIDI (`aumf`): prima Live non lo proponeva come
+destinazione. Dopo l'aggiornamento, nei set già salvati va reinserita la versione AU.
+La Standalone riceve la KeyLab direttamente.
 
 ## Compilazione
 

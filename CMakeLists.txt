@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.22)
 set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "")
 set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
 
-project(ALEA VERSION 1.3.0 LANGUAGES C CXX)
+project(ALEA VERSION 1.3.1 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -32,7 +32,7 @@ juce_add_plugin(ALEA
     NEEDS_MIDI_INPUT TRUE          # riceve i CC dalla tastiera controller
     NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
-    AU_MAIN_TYPE kAudioUnitType_Effect
+    AU_MAIN_TYPE kAudioUnitType_MusicEffect   # effetto controllabile via MIDI: Live e Logic gli mandano i CC
     VST3_CATEGORIES Fx Filter
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
     ICON_BIG resources/icon.png
